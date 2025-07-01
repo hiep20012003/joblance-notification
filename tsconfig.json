@@ -1,0 +1,35 @@
+{
+  "compilerOptions": {
+    "declaration": true,
+    "experimentalDecorators": true,
+    "allowSyntheticDefaultImports": true,
+    "importHelpers": true,
+    "lib": ["dom", "esnext"],
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "noEmitOnError": true,
+    "baseUrl": ".",
+    "outDir": "./build",
+    "rootDir": ".",
+    "sourceMap": true,
+    "strict": true,
+    "noImplicitAny": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "esModuleInterop": true,
+    "alwaysStrict": true,
+    "emitDecoratorMetadata": true,
+    "forceConsistentCasingInFileNames": true,
+    "pretty": true,
+    "resolveJsonModule": true,
+    "plugins": [
+      { "transform": "typescript-transform-paths" },
+      { "transfrom": "typescript-transform-paths", "afterDeclarations": true }
+    ],
+    "paths": {
+      "@notifications/*": ["src/*"]
+    }
+  },
+  "include": ["src"],
+  "exclude": ["node_modules"]
+}

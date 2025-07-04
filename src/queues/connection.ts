@@ -1,6 +1,7 @@
 import { config } from '@notifications/config';
 import { logger } from '@notifications/app';
 import client, { Channel } from 'amqplib';
+import { DependencyError } from '@hiep20012003/joblance-shared';
 
 async function createConnection(): Promise<Channel | undefined> {
   try {
@@ -10,7 +11,7 @@ async function createConnection(): Promise<Channel | undefined> {
     closeConnection(channel, connection);
     return channel;
   } catch (error) {
-    logger.error('Error occurred in NotificationService createConnection() method:', error);
+    throw new DependencyError('RabbitMQ connection failed', `${logger.getServiceName()}.createConnection()`);
   }
 }
 

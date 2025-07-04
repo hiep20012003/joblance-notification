@@ -1,10 +1,11 @@
 import path from 'path';
 
-import { IBaseEmailLocals } from '@hiep20012003/joblance-shared';
+import { DependencyError, IBaseEmailLocals } from '@hiep20012003/joblance-shared';
 import { config } from '@notifications/config';
-import { logger } from '@notifications/app';
 import Email from 'email-templates';
 import nodemailer, { Transporter } from 'nodemailer';
+import { Channel } from 'amqplib';
+import { logger } from '@notifications/app';
 
 async function emailTemplates(template: string, receiver: string, locals: IBaseEmailLocals): Promise<void> {
   try {
@@ -44,9 +45,69 @@ async function emailTemplates(template: string, receiver: string, locals: IBaseE
       locals
     });
   } catch (error) {
-    logger.error('Error occurred in NotificationService emailTemplates() method:', error);
-    console.log('Error details:', error);
+    throw new DependencyError(
+      'Failed to send email',
+      'EmailService',
+      'EMAIL_SEND_FAILURE'
+    );
   }
 }
 
-export { emailTemplates };
+async function setupRetryQueue(
+  channel: Channel,
+  baseQueueName: string,
+  routingKey: string,
+  mainExchange: string,
+) {
+  const baseQueue = `${baseQueueName}.queue`;
+  const retryQueue = `${baseQueueName}.retry.queue`;
+  const deadQueue = `${baseQueueName}.dead.queue`;
+  
+  const retryRoutingKey = `${routingKey}.retry`;
+  const deadRoutingKey = `${routingKey}.dead`;
+  
+  const retryExchange = `${mainExchange}.retry`;
+  const deadExchange = `${mainExchange}.dead`;
+  
+  // for (const queue of [baseQueue, retryQueue, deadQueue]) {
+  //   try {
+  //     await channel.deleteQueue(queue, { ifUnused: false, ifEmpty: false });
+  //     logger.info(`Deleted old queue: ${queue}`);
+  //   } catch (err) {
+  //     logger.warn(`Queue ${queue} may not exist, skip deletion`);
+  //   }
+  // }
+  
+  await channel.assertExchange(mainExchange, 'direct', { durable: true });
+  await channel.assertExchange(retryExchange, 'direct', { durable: true });
+  await channel.assertExchange(deadExchange, 'direct', { durable: true });
+  
+  // Main queue
+  await channel.assertQueue(baseQueue, {
+    durable: true,
+    arguments: {
+      'x-dead-letter-exchange': retryExchange,
+      'x-dead-letter-routing-key': retryRoutingKey
+    }
+  });
+  
+  // Retry queue
+  await channel.assertQueue(retryQueue, {
+    durable: true,
+    arguments: {
+      'x-message-ttl': 10000, // 10s delay
+      'x-dead-letter-exchange': mainExchange,
+      'x-dead-letter-routing-key': routingKey
+    }
+  });
+  
+  await channel.assertQueue(deadQueue, { durable: true });
+
+  await channel.bindQueue(baseQueue, mainExchange, routingKey);
+  await channel.bindQueue(retryQueue, retryExchange, retryRoutingKey);
+  await channel.bindQueue(deadQueue, deadExchange, deadRoutingKey);
+
+  logger.info(`Retry queue setup complete for ${baseQueueName}`);
+}
+
+export { emailTemplates, setupRetryQueue };

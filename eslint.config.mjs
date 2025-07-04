@@ -27,30 +27,48 @@ export default defineConfig([
       },
     },
     rules: {
-      'no-multiple-empty-lines': [2, { max: 2 }],
-      semi: [2, 'always'],
-      curly: 'warn',
-      'prefer-template': 'warn',
-      'space-before-function-paren': 0,
+      // General code style
+      'array-bracket-spacing': ['error', 'never'],
+      'block-spacing': ['error', 'always'],
       camelcase: 0,
+      'comma-spacing': ['error', { before: false, after: true }],
+      'computed-property-spacing': ['error', 'never'],
+      curly: 'warn',
+      'indent': ['error', 2],
+      'key-spacing': ['error', { beforeColon: false, afterColon: true }],
+      'keyword-spacing': ['error', { before: true, after: true }],
+      'no-multi-spaces': 'error',
+      'no-multiple-empty-lines': [2, { max: 2 }],
       'no-return-assign': 0,
+      'object-curly-spacing': ['error', 'always'],
+      'prefer-template': 'warn',
       quotes: ['error', 'single', { allowTemplateLiterals: true }],
-      '@typescript-eslint/no-non-null-assertion': 'off',
-      '@typescript-eslint/no-namespace': 'off',
+      semi: [2, 'always'],
+      'semi-spacing': ['error', { before: false, after: true }],
+      'space-before-blocks': ['error', 'always'],
+      'space-before-function-paren': 0, // Disabled to allow flexibility
+      'space-in-parens': ['error', 'never'],
+      'space-infix-ops': 'error',
+
+      // TypeScript specific
       '@typescript-eslint/explicit-module-boundary-types': 'off',
+      '@typescript-eslint/no-namespace': 'off',
+      '@typescript-eslint/no-non-null-assertion': 'off',
+
+      // Import plugin
       'import/no-unresolved': 0,
       'import/order': [
         'warn',
         {
           groups: [
-            'builtin',
-            'external',
-            'internal',
-            'parent',
-            'sibling',
-            'index',
-            'type',
-            'object',
+            'builtin', // Node "builtin" modules
+            'external', // External modules (from node_modules)
+            'internal', // Internal modules (alias, src, etc.)
+            'parent', // Parent directories
+            'sibling', // Sibling files
+            'index', // Index file
+            'type', // Type imports
+            'object', // Object imports
           ],
           'newlines-between': 'always',
         },

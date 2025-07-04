@@ -1,8 +1,8 @@
-import { createLogger } from '@hiep20012003/joblance-shared';
+import { Logger } from '@hiep20012003/joblance-shared';
 import express, { Express } from 'express';
 import NotifiactionServer from '@notifications/server';
 
-export const logger = createLogger('NotificationsService');
+export const logger = new Logger('NotificationsService');
 
 class Application {
   private app: Express;

@@ -10,6 +10,7 @@ class Config {
   public RABBITMQ_ENDPOINT: string | undefined;
   public SENDER_EMAIL: string | undefined;
   public SENDER_EMAIL_PASSWORD: string | undefined;
+  public APP_ICON: string | undefined;
 
   constructor() {
     this.NODE_ENV = process.env.NODE_ENV || '';
@@ -20,6 +21,7 @@ class Config {
     this.RABBITMQ_ENDPOINT = process.env.RABBITMQ_ENDPOINT || '';
     this.SENDER_EMAIL = process.env.SENDER_EMAIL || '';
     this.SENDER_EMAIL_PASSWORD = process.env.SENDER_EMAIL_PASSWORD || '';
+    this.APP_ICON = process.env.APP_ICON || '';
   }
 }
 

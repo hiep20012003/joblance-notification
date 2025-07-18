@@ -1,83 +1,71 @@
 import http from 'http';
 
-import 'express-async-errors';
-// import { IAuthEmailMessageDetails } from '@hiep20012003/joblance-shared';
-import { logger } from '@notifications/app';
+import { AppLogger } from '@notification/utils/logger';
 import { Application } from 'express';
-import { ejsRenderRoutes, healthRoutes } from '@notifications/routes';
-import { createConnection } from '@notifications/queues/connection';
+import { ejsRenderRoutes, healthRoutes } from '@notification/routes';
+import { createConnection } from '@notification/queues/connection';
 import { Channel } from 'amqplib';
-import { consumeAuthEmailMessages, consumeOrderEmailMessages } from '@notifications/queues/email.consumer';
-import { config } from '@notifications/config';
-import { DependencyError, errorHandler, IAuthEmailMessageDetails, ServerError } from '@hiep20012003/joblance-shared';
+import { config } from '@notification/config';
+import { ServerError } from '@hiep20012003/joblance-shared';
+import { consumeAuthEmails } from '@notification/queues/consumers/auth.consumer';
 
 const SERVER_PORT = config.PORT || 4001;
 
-class NotifiactionServer {
+export class NotificationServer {
   private app: Application;
 
   constructor(app: Application) {
     this.app = app;
   }
 
-  public start(): void {
+  async start(): Promise<void> {
+    const operation = 'notification-server-start';
+
     this.app.set('view engine', 'ejs');
     this.app.use('', healthRoutes());
     this.app.use('', ejsRenderRoutes());
-    this.app.use(errorHandler(logger));
-    this.startQueue();
-    this.startServer(this.app);
+
+    await this.startQueue();
+    this.startServer(this.app, operation);
   }
 
-  async startQueue(): Promise<void> {
+  private async startQueue(): Promise<void> {
+    const operation = 'notification-queue-start';
     const emailChannel: Channel = (await createConnection()) as Channel;
-    await consumeAuthEmailMessages(emailChannel);
-    await consumeOrderEmailMessages(emailChannel);
 
-    const verificationLink = `${config.CLIENT_URL}/confirm_email?v_token=123425afadsfasdf`;
-    const messageDetails: IAuthEmailMessageDetails = {
-      receiverEmail: `nguyendunghiep20012003@gmail.com`,
-      verifyLink: verificationLink,
-      template: 'verifyEmail'
-    };
+    await Promise.all([
+      consumeAuthEmails(emailChannel)
+    ]);
 
-    // Use more descriptive and consistent exchange and queue names
-    await emailChannel.assertExchange('jbl.auth.notification', 'direct');
-    await emailChannel.assertExchange('jbl.order.notification', 'direct');
-    const message = JSON.stringify(messageDetails);
-    emailChannel.publish('jbl.auth.notification', 'auth.email', Buffer.from(message));
+    AppLogger.info('Notification queue consumers started', { operation });
   }
 
-  private async startServer(app: Application): Promise<void> {
+  private startServer(app: Application, operation: string): void {
     try {
       const httpServer: http.Server = new http.Server(app);
-      await this.startHttpServer(httpServer);
+      this.startHttpServer(httpServer, operation);
     } catch (error) {
-      const err = new ServerError(
-        'Failed to start NotificationsService server',
-        'NotificationsService.startServer',
-        'SERVER_START_FAILURE'
-      );
-      logger.error(err);
+      throw new ServerError({
+        logMessage: 'Failed to start Notification server',
+        cause: error,
+        operation: 'notification-server-error'
+      });
     }
   }
 
-  private async startHttpServer(httpServer: http.Server): Promise<void> {
+  private startHttpServer(httpServer: http.Server, operation: string): void {
     try {
-      logger.info(`Notifications server started with process id ${process.pid}`);
+      AppLogger.info(`Notification server started with process id ${process.pid}`, { operation });
+
       httpServer.listen(SERVER_PORT, () => {
-        logger.info(`Gateway server is running on port ${SERVER_PORT}`);
+        AppLogger.info(`Notification server is running on port ${SERVER_PORT}`, { operation });
       });
     } catch (error) {
-      const err = new DependencyError(
-        'Failed to bind HTTP port',
-        'NotificationsService.startHttpServer',
-        'PORT_BIND_FAILURE'
-      );
-      logger.error(err);
+      throw new ServerError({
+        logMessage: 'Failed to bind HTTP port',
+        cause: error,
+        operation: 'notification-server-bind-error'
+      });
     }
   }
-
 }
-
-export default NotifiactionServer;

@@ -1,23 +1,46 @@
-import { Logger } from '@hiep20012003/joblance-shared';
 import express, { Express } from 'express';
-import NotifiactionServer from '@notifications/server';
-
-export const logger = new Logger('NotificationsService');
-
+import { NotificationServer } from '@notification/server';
+import { AppLogger } from '@notification/utils/logger';
 class Application {
   private app: Express;
-  private server: NotifiactionServer;
+  private server: NotificationServer;
 
   constructor() {
     this.app = express();
-    this.server = new NotifiactionServer(this.app);
+    this.server = new NotificationServer(this.app);
   }
 
-  public initialize(): void {
-    this.server.start();
-    logger.info('Notification Service initialized.');
+  public async initialize(): Promise<void> {
+    const operation = 'notification-service-init';
+
+    try {
+      await this.server.start();
+      AppLogger.info('Notification Service initialized', { operation });
+    } catch (error) {
+      AppLogger.error('', { operation, error });
+      process.exit(1);
+    }
   }
 }
 
-const application: Application = new Application();
-application.initialize();
+async function bootstrap(): Promise<void> {
+  const application = new Application();
+  await application.initialize();
+}
+
+// ---- Global error handlers ---- //
+process.on('uncaughtException', (error) => {
+  AppLogger.error('', { operation: 'notification-service-uncaught-exception', error });
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason) => {
+  AppLogger.error('', { operation: 'notification-service-unhandled-rejection', error: reason });
+  process.exit(1);
+});
+
+// ---- App Entry Point ---- //
+bootstrap().catch((error) => {
+  AppLogger.error('', { operation: 'notification-service-bootstrap-failed', error });
+  process.exit(1);
+});

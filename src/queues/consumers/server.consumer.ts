@@ -1,19 +1,20 @@
 import {AppLogger} from '@notifications/utils/logger';
 import {EXCHANGES, MessageQueue} from '@hiep20012003/joblance-shared';
 
-import {handleAuthMessage} from '../handlers/auth.handler';
-import {consumerChannel} from "@notifications/queues/connection";
+import {consumerChannel} from '../connection';
+import {handleServerMessage} from '../handlers/server.handler';
 
-export async function consumeAuthMessage(messageQueue: MessageQueue) {
-  const exchange = EXCHANGES.AUTH.name;
-  const queue = 'notification.auth';
+
+export async function consumeServerMessage(messageQueue: MessageQueue) {
+  const exchange = EXCHANGES.SERVER.name;
+  const queue = 'gig.users';
 
   await messageQueue.consume({
     channelName: consumerChannel,
     exchange,
     queue,
-    handler: handleAuthMessage,
-    handlerRetryError: (operation: string, context) => {
+    handler: handleServerMessage,
+    handlerRetryError: (operation: string, context: unknown) => {
       AppLogger.error(
         `Exceeded max retries`,
         {
@@ -25,7 +26,7 @@ export async function consumeAuthMessage(messageQueue: MessageQueue) {
     maxRetries: 5,
   });
 
-  AppLogger.info('Auth email consumer started', {
+  AppLogger.info('Server message consumer listening to queue', {
     operation: 'consumer:init',
     context: {queue, exchange},
   });

@@ -1,36 +1,32 @@
-import { config } from '@notification/config';
-import { AppLogger } from '@notification/utils/logger';
-import client, { Channel } from 'amqplib';
-import { ServerError } from '@hiep20012003/joblance-shared';
+import {config} from '@notifications/config';
+import {AppLogger} from '@notifications/utils/logger';
+import {MessageQueue, setupAllQueues} from '@hiep20012003/joblance-shared';
+import {consumeOrderMessage} from '@notifications/queues/consumers/order.consumer';
+import {consumeNewMessage} from '@notifications/queues/consumers/message.consumer';
 
-async function createConnection(): Promise<Channel | undefined> {
-  try {
-    const connection = await client.connect(`${config.RABBITMQ_ENDPOINT}`);
-    const channel: Channel = await connection.createChannel();
+import {consumeAuthMessage} from './consumers/auth.consumer';
 
-    AppLogger.info('RabbitMQ connection established successfully', { operation: 'rabbitmq-connect' });
+export const messageQueue = MessageQueue.getInstance(`${config.RABBITMQ_URL}`);
 
-    closeConnection(channel, connection);
-    return channel;
-  } catch (error) {
-    throw new ServerError({
-      logMessage: 'Failed to establish RabbitMQ connection',
-      cause: error,
-      operation: 'rabbitmq-connect'
-    });
-  }
-}
+export const publishChannel: string = 'notification-publish-channel';
+export const consumerChannel: string = 'notification-consumer-channel';
 
-function closeConnection(channel: Channel, connection: client.ChannelModel): void {
-  process.once('SIGINT', () => {
-    channel.close()
-      .then(() => connection.close())
-      .then(() => {
-        AppLogger.info('RabbitMQ connection closed via SIGINT', { operation: 'rabbitmq-disconnect' });
-      })
-      .catch(err => {
-        AppLogger.error(`Error closing RabbitMQ connection`, { operation: 'rabbitmq-disconnect', error: { ...(err as Error) } });
-      });
+export async function initQueue() {
+  await messageQueue.connect();
+  AppLogger.info('RabbitMQ connection established successfully', {
+    operation: 'queue:connect'
   });
+  await setupAllQueues(messageQueue, (error: Error, queueName?: string) => {
+    AppLogger.error(
+      `[Setup] Failed to setup queue${queueName ? ` "${queueName}"` : ''}`,
+      {
+        operation: 'queue:setup-all',
+        error: error,
+      }
+    );
+  });
+  await consumeAuthMessage(messageQueue);
+  await consumeOrderMessage(messageQueue);
+  await consumeNewMessage(messageQueue);
 }
-export { createConnection };
+

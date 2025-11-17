@@ -1,26 +1,32 @@
-FROM node:22.14.0 as builder
+# =========================================
+# Stage 1: Builder
+# =========================================
+FROM node:22-slim AS builder
 
-# stage 1
 WORKDIR /app
-COPY package.json ./
+
+COPY package.json package-lock.json .npmrc ./
+
+RUN --mount=type=secret,id=NPM_TOKEN \
+    NPM_TOKEN=$(cat /run/secrets/NPM_TOKEN) npm ci
+
 COPY tsconfig.json ./
-COPY .npmrc ./
 COPY src ./src
-COPY tools ./tools
-RUN npm install -g npm@latest
-RUN npm ci && npm run build
+RUN npm run build
 
-# stage 2
-FROM node:22.14.0
+# =========================================
+# Stage 2: Runtime
+# =========================================
+FROM node:22-slim
+
 WORKDIR /app
-RUN apk add --no-cache curl
-COPY package.json ./
-COPY tsconfig.json ./
-COPY .npmrc ./
-RUN npm install -g pm2 npm@latest
-RUN npm ci --production
-COPY --from=builder /app/build ./build
+
+COPY --from=builder /app/build ./src
+COPY --from=builder /app/node_modules ./node_modules
+COPY package.json package-lock.json ./
+
+RUN npm install -g pm2
 
 EXPOSE 4001
 
-CMD [ "npm","run","start" ]
+ENTRYPOINT ["pm2-runtime", "start", "./src/app.js"]

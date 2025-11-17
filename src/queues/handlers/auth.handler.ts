@@ -1,57 +1,69 @@
-import { AuthEmailMessage, EmailPayload, EmailTemplateContext, EmailTemplate, ResetPasswordTemplateContext, VerifyEmailTemplateContext, WelcomeEmailTemplateContext } from '@hiep20012003/joblance-shared';
-import { config } from '@notification/config';
-import { EmailService } from '@notification/emails/email.service';
+import { IEmailPayload, IEmailTemplateContext, EmailTemplate, IResetPasswordTemplateContext, IVerifyEmailTemplateContext, MessageQueueType, NotImplementedError, IAuthMessageQueue } from '@hiep20012003/joblance-shared';
+import { config } from '@notifications/config';
+import { EmailService } from '@notifications/emails/email.service';
+import { v4 as uuidv4 } from 'uuid';
 
-export async function handleAuthEmailMessage(payload: AuthEmailMessage): Promise<void> {
+export async function handleAuthMessage<T extends Required<IAuthMessageQueue>>(payload: T): Promise<void> {
   const {
-    to,
+    type,
+    email,
     username,
     verificationLink,
     resetLink,
-    template
+    messageId
   } = payload;
 
   const baseContext = {
-    appLink: config.CLIENT_URL as string,
-    appIcon: config.APP_ICON as string
+    appLink: config.CLIENT_URL,
+    appIcon: config.APP_ICON
   };
 
   let subject: string;
-  let context: EmailTemplateContext;
+  let context: IEmailTemplateContext;
+  let template: EmailTemplate;
 
-  switch (payload.template) {
-    case EmailTemplate.VERIFY_EMAIL:
+
+  switch (type) {
+    case MessageQueueType.USER_CREATED:
+      template = EmailTemplate.VERIFY_EMAIL;
       context = {
         ...baseContext,
         username,
-        verificationLink: verificationLink as string
-      } satisfies VerifyEmailTemplateContext;
+        verificationLink: verificationLink
+      } satisfies IVerifyEmailTemplateContext;
       subject = 'Verify your email address';
       break;
 
-    case EmailTemplate.RESET_PASSWORD:
+    case MessageQueueType.USER_PASSWORD_RESET_REQUESTED:
+      template = EmailTemplate.FORGOT_PASSWORD;
       context = {
         ...baseContext,
         username,
-        resetLink: resetLink as string
-      } satisfies ResetPasswordTemplateContext;
+        resetLink: resetLink
+      } satisfies IResetPasswordTemplateContext;
       subject = 'Reset your password';
       break;
-
-    case EmailTemplate.WELCOME:
+    case MessageQueueType.USER_RESEND_VERIFICATION_EMAIL_REQUESTED:
+      template = EmailTemplate.VERIFY_EMAIL;
       context = {
         ...baseContext,
-        username
-      } satisfies WelcomeEmailTemplateContext;
-      subject = 'Welcome to Joblance!';
+        username,
+        verificationLink,
+      };
+      subject = 'Resend email verification';
       break;
 
     default:
-      throw new Error(`Unsupported email template: ${template}`);
+      throw new NotImplementedError({
+        clientMessage: `Message type '${type}' not implemented`,
+        logMessage: `Unrecognized MessageQueueType: ${type}`,
+        operation: 'consumer:handle-email-error'
+      });
   }
 
-  const emailPayload: EmailPayload = {
-    to,
+  const emailPayload: IEmailPayload = {
+    to: email,
+    messageId: messageId ?? uuidv4(),
     subject,
     template,
     context

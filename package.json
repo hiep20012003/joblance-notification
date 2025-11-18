@@ -12,7 +12,7 @@
     "lint:fix": "eslint src/**/*.ts --fix",
     "prettier:check": "prettier --check src/**/*.{ts,json}",
     "prettier:fix": "prettier --write src/**/*.{ts,json}",
-    "build": "tsc --project tsconfig.json && tsc-alias -p tsconfig.json",
+    "build": "tsc --project tsconfig.json && tsc-alias -p tsconfig.json && ts-node tools/copyEmailTemplate.ts",
     "test": "jest --coverage --maxWorkers=1 --forceExit --detectOpenHandles --watchAll=false"
   },
   "devDependencies": {
@@ -27,6 +27,7 @@
     "@types/hpp": "^0.2.6",
     "@types/node": "^22.16.3",
     "@types/nodemailer": "^6.4.17",
+    "@types/shelljs": "^0.8.17",
     "@typescript-eslint/eslint-plugin": "^8.36.0",
     "@typescript-eslint/parser": "^8.36.0",
     "cross-env": "^7.0.3",

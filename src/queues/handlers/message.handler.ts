@@ -1,17 +1,12 @@
-import {IChatMessageQueue, MessageQueueType} from '@hiep20012003/joblance-shared';
-import {AppLogger} from '@notifications/utils/logger';
-import {NotificationServer} from '@notifications/server';
-import {cacheStore} from '@notifications/cache/redis.connection';
-import {Server} from 'socket.io';
+import { IChatMessageQueue, MessageQueueType } from '@hiep20012003/joblance-shared';
+import { AppLogger } from '@notifications/utils/logger';
+import { NotificationServer } from '@notifications/server';
+import { cacheStore } from '@notifications/cache/redis.connection';
+import { Server } from 'socket.io';
 
-// Thời gian tối thiểu giữa hai lần gửi thông báo In-App Alert (chỉ áp dụng cho Alert)
 const THROTTLE_TTL_SECONDS = 5;
 
-/**
- * Xử lý tin nhắn mới hoặc sự kiện đã đọc từ Chat Service qua Message Queue.
- *
- * @param payload Dữ liệu từ Message Queue.
- */
+
 export async function handleNewMessage<T extends Required<IChatMessageQueue>>(payload: T) {
   await Promise.resolve();
 
@@ -26,33 +21,30 @@ export async function handleNewMessage<T extends Required<IChatMessageQueue>>(pa
   } = payload;
 
   if (!conversation || !conversation?._id) {
-    AppLogger.warn(`[Chat Consumer] Payload is invalid or missing conversation data.`, {operation: 'consumer:handler'});
+    AppLogger.warn(`[Chat Consumer] Payload is invalid or missing conversation data.`, { operation: 'consumer:handler' });
     return;
   }
 
   const conversationId = conversation._id;
 
-  // Lấy danh sách ID người nhận (trừ người tạo sự kiện)
   const recipientIds = conversation.participants;
 
   const io: Server = NotificationServer.getSocketIO();
-  const notificationNamespace = io.of('/notifications'); // Namespace thông báo chung
+  const notificationNamespace = io.of('/notifications');
 
   switch (type) {
     case MessageQueueType.MESSAGE_SENT: {
       if (!message) return;
 
       for (const recipientId of recipientIds) {
-        // --- 1. KIỂM TRA TRẠNG THÁI ONLINE TỔNG THỂ ---
         const isOnline = await cacheStore.getClient().sismember('loggedInUsers', recipientId);
 
         if (!isOnline) {
-          AppLogger.info(`User ${recipientId} is OFFLINE. Triggering Push Notification logic.`, {operation: 'consumer:handler'});
+          AppLogger.info(`User ${recipientId} is OFFLINE. Triggering Push Notification logic.`, { operation: 'consumer:handler' });
           // TODO: Kích hoạt dịch vụ Push Notification
           continue;
         }
 
-        // --- 2. XÁC ĐỊNH TRẠNG THÁI XEM (VIEWING STATUS) ---
         const currentViewingRoom = await cacheStore.get(`user:current_room:${recipientId}`);
         const isViewingConversation = currentViewingRoom === conversationId;
 
@@ -64,14 +56,10 @@ export async function handleNewMessage<T extends Required<IChatMessageQueue>>(pa
         };
 
         if (!isViewingConversation) {
-          // --- User KHÔNG xem chat này: Cần Cập nhật List & Alert ---
-
-          // 2.1. Cập nhật Danh sách (chat:list_update) - KHÔNG THROTTLE
-          // Đảm bảo danh sách inbox bên trái được cập nhật tin nhắn mới nhất ngay lập tức.
           notificationNamespace
-            .emit('chat:list_update', recipientId, {...basePayload, type: 'list_update'});
+            .emit('chat:list_update', recipientId, { ...basePayload, type: 'list_update' });
 
-          AppLogger.info(`List update sent to User ${recipientId} for conversation ${conversationId}.`, {operation: 'consumer:handler'});
+          AppLogger.info(`List update sent to User ${recipientId} for conversation ${conversationId}.`, { operation: 'consumer:handler' });
 
           // 2.2. BATCHING VÀ THROTTLING (chat:alert) - CHỈ ÁP DỤNG CHO ALERT
           const throttleKey = `notification:throttle:${recipientId}`;
@@ -82,20 +70,14 @@ export async function handleNewMessage<T extends Required<IChatMessageQueue>>(pa
           if (isFirstInBatch === 'OK' && recipientId !== actorId) {
             // GỬI ALERT (Thông báo trên icon)
             notificationNamespace
-              .emit('chat:alert', recipientId, {...basePayload, type: 'alert'});
-            AppLogger.info(`🔔 Sent In-App Alert (BATCH START) to User ${recipientId}.`, {context: {throttle: 'START'}});
+              .emit('chat:alert', recipientId, { ...basePayload, type: 'alert' });
+            AppLogger.info(`Sent In-App Alert (BATCH START) to User ${recipientId}.`, { context: { throttle: 'START' } });
           } else {
-            AppLogger.info(`⏱️ Notification throttled (Alert only) for User ${recipientId}.`, {context: {throttle: 'SKIPPED'}});
+            AppLogger.info(`Notification throttled (Alert only) for User ${recipientId}.`, { context: { throttle: 'SKIPPED' } });
           }
 
         } else {
-          // // --- User ĐANG xem chat này: Gửi Real-time Message (chat:message) - KHÔNG Throttle ---
-          //
-          // // Gửi tin nhắn để hiển thị trong khung chat đang mở
-          // notificationNamespace
-          //   .emit('chat:message', recipientId, {...basePayload, type: 'in-conversations'});
-
-          AppLogger.info(`⚡ Sent Real-time Message to User ${recipientId} viewing conversation ${conversationId}.`, {operation: 'consumer:handler'});
+          AppLogger.info(`⚡ Sent Real-time Message to User ${recipientId} viewing conversation ${conversationId}.`, { operation: 'consumer:handler' });
         }
       }
       break;
@@ -131,7 +113,7 @@ export async function handleNewMessage<T extends Required<IChatMessageQueue>>(pa
 
           AppLogger.info(`Read Receipt sent to User ${recipientId} for conversation ${conversationId}.`, {
             operation: 'consumer:handler',
-            context: {reader: actorId, recipient: recipientId}
+            context: { reader: actorId, recipient: recipientId }
           });
         }
       }
@@ -139,7 +121,7 @@ export async function handleNewMessage<T extends Required<IChatMessageQueue>>(pa
     }
 
     default:
-      AppLogger.warn(`[Chat Consumer Handler] Unhandled event type: ${type}`, {operation: 'consumer:handler'});
+      AppLogger.warn(`[Chat Consumer Handler] Unhandled event type: ${type}`, { operation: 'consumer:handler' });
       break;
   }
 }

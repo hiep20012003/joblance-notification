@@ -1,5 +1,5 @@
-import {healthController} from '@notifications/controllers/health.controller';
-import express, {Router} from 'express';
+import { healthController } from '@notifications/controllers/health.controller';
+import express, { Router } from 'express';
 
 class HealthRoutes {
   private readonly router: Router;
@@ -9,7 +9,7 @@ class HealthRoutes {
   }
 
   public routes(): Router {
-    this.router.get('/health', healthController.health);
+    this.router.get('/notification-health', healthController.health);
     return this.router;
   }
 }
